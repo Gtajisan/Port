@@ -1,96 +1,173 @@
-# Workspace
+# Baka-Chan Bot
 
 ## Overview
+Baka-Chan Bot is a modernized Facebook Messenger bot built with the ws3-fca library. This project has been rebranded from Goat Bot and now features a clean, modern architecture with updated dependencies.
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+**Current Version:** 2.0.0  
+**Maintained by:** Gtajisan (ffjisan804@gmail.com)  
+**GitHub:** https://github.com/Gtajisan/baka-chan-bot
 
-## Stack
+## Recent Changes (October 11, 2025)
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+### Major Updates
+1. **FCA Library Replacement** - Replaced old nexus-fca with ws3-fca (https://github.com/tas33n/ws3-fca)
+2. **Complete Rebranding** - Changed from Goat Bot to Baka-Chan Bot throughout the codebase
+3. **Dependency Cleanup** - Removed Google APIs, verification system, and dashboard features
+4. **Fixed Console Errors** - Resolved LSP errors and updated deprecated syntax
+5. **Modernized Structure** - Updated project configuration and removed unused features
 
-## Structure
+### Removed Features
+- Google Drive API integration
+- Gmail/Email functionality
+- Dashboard UI (removed entire dashboard directory)
+- User verification system
+- Google reCAPTCHA
 
-```text
-artifacts-monorepo/
-├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
-├── lib/                    # Shared libraries
-│   ├── api-spec/           # OpenAPI spec + Orval codegen config
-│   ├── api-client-react/   # Generated React Query hooks
-│   ├── api-zod/            # Generated Zod schemas from OpenAPI
-│   └── db/                 # Drizzle ORM schema + DB connection
-├── scripts/                # Utility scripts (single workspace package)
-│   └── src/                # Individual .ts scripts, run via `pnpm --filter @workspace/scripts run <script>`
-├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, lib/integrations/*, scripts)
-├── tsconfig.base.json      # Shared TS options (composite, bundler resolution, es2022)
-├── tsconfig.json           # Root TS project references
-└── package.json            # Root package with hoisted devDeps
+### Architecture Changes
+- **FCA Integration:** Bot now uses ws3-fca located in `fb-chat-api/` directory
+- **Simplified Config:** Removed Google credentials and dashboard settings from config.json
+- **Cleaner Dependencies:** Removed googleapis, nodemailer, and dashboard-related packages
+
+## Project Structure
+
+```
+baka-chan-bot/
+├── bot/                    # Bot core logic
+│   ├── handler/           # Event and action handlers
+│   └── login/             # Login and authentication
+├── fb-chat-api/           # ws3-fca library
+├── assets/                # Bot assets and media
+├── database/              # Database schemas
+├── languages/             # Localization files
+├── scripts/               # Utility scripts
+├── logger/                # Logging utilities
+├── Goat.js               # Main bot file
+├── index.js              # Entry point with auto-restart
+├── config.json           # Bot configuration
+└── package.json          # Dependencies
 ```
 
-## TypeScript & Composite Projects
+## Setup & Configuration
 
-Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references. This means:
+### Prerequisites
+- Node.js >= 18.x
+- npm >= 8.0.0
 
-- **Always typecheck from the root** — run `pnpm run typecheck` (which runs `tsc --build --emitDeclarationOnly`). This builds the full dependency graph so that cross-package imports resolve correctly. Running `tsc` inside a single package will fail if its dependencies haven't been built yet.
-- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck; actual JS bundling is handled by esbuild/tsx/vite...etc, not `tsc`.
-- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array. `tsc --build` uses this to determine build order and skip up-to-date packages.
+### Installation
+```bash
+npm install
+```
 
-## Root Scripts
+### Configuration Files
+1. **config.json** - Main bot configuration
+   - **IMPORTANT:** Add your Facebook account email/password (never commit credentials to Git)
+   - Configure bot prefix and nickname
+   - Set admin IDs  
+   - Database settings (SQLite/MongoDB)
 
-- `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages that define it
-- `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
+2. **account.txt** - Facebook cookies/credentials (auto-populated)
 
-## Packages
+### Security Notes
+⚠️ **NEVER commit real Facebook credentials to the repository!**
+- Keep config.json in .gitignore
+- Use environment variables for production
+- Change default credentials before first use
 
-### `artifacts/api-server` (`@workspace/api-server`)
+### Running the Bot
+```bash
+npm start       # Production mode
+npm run dev     # Development mode
+```
 
-Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
+## Facebook Login
 
-- Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
-- Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
+The bot supports multiple login methods:
+1. Email/Password with 2FA
+2. Facebook Token
+3. Cookie String
+4. Cookie Array
 
-### `lib/db` (`@workspace/db`)
+Note: Facebook may block login from unknown locations. If you encounter login errors, try logging in from a browser first to verify your account.
 
-Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
+## User Preferences
 
-- `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
-- `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
-- Exports: `.` (pool, db, schema), `./schema` (schema only)
+### Coding Style
+- Standard JavaScript with Node.js best practices
+- Async/await for asynchronous operations
+- Modular structure with clear separation of concerns
 
-Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
+### Bot Configuration
+- **Prefix:** `!` (configurable in config.json)
+- **Database:** SQLite (can be changed to MongoDB)
+- **Timezone:** Asia/Ho_Chi_Minh (configurable)
 
-### `lib/api-spec` (`@workspace/api-spec`)
+## Instagram Mode (New)
 
-Owns the OpenAPI 3.1 spec (`openapi.yaml`) and the Orval config (`orval.config.ts`). Running codegen produces output into two sibling packages:
+Baka-Chan Bot now supports running on Instagram DM via a zero-modification adapter layer.
 
-1. `lib/api-client-react/src/generated/` — React Query hooks + fetch client
-2. `lib/api-zod/src/generated/` — Zod schemas
+### How it works
+- `instagram/adapter.js` — FCA-interface-compatible api object using `instagram-private-api`
+- `instagram/sessionManager.js` — AES-256 encrypted session persistence (session.json)
+- `instagram/messageMapper.js` — Instagram DM items → FCA-compatible event objects
+- `instagram/rateLimiter.js` — 30 messages/60s per user/thread with exponential backoff
+- `instagram/mediaHandler.js` — Image optimization (sharp), buffer download/upload
+- `instagram/logger.js` — chalk + winston + daily-rotate-file logging
+- `bot/login/loginInstagram.js` — Instagram login bridge (replaces login.js logic)
+- `Goat.ig.js` — Instagram-mode entry point (twin of Goat.js)
 
-Run codegen: `pnpm --filter @workspace/api-spec run codegen`
+### Switching to Instagram Mode
+```bash
+# 1. Copy .env.example to .env
+cp .env.example .env
 
-### `lib/api-zod` (`@workspace/api-zod`)
+# 2. Fill in your Instagram credentials
+# Edit .env:  IG_USERNAME, IG_PASSWORD, INSTAGRAM_MODE=true
 
-Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used by `api-server` for response validation.
+# 3. Start the bot — index.js detects INSTAGRAM_MODE=true and spawns Goat.ig.js
+npm start
+```
 
-### `lib/api-client-react` (`@workspace/api-client-react`)
+### API Compatibility
+The `api` object returned by `createInstagramAPI()` is 100% interface-compatible with FCA:
+- `sendMessage`, `sendTypingIndicator`, `markAsRead`, `unsendMessage`
+- `getUserInfo`, `getThreadInfo`, `getThreadList`
+- `setMessageReaction`, `listenMqtt`, `stopListening`
+- `getCurrentUserID`, `getFriendsList`
+- FCA stubs (no-ops): `setOptions`, `getAppState`, `refreshFb_dtsg`
 
-Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
+All existing commands (`scripts/cmds/`) and events (`scripts/events/`) work unchanged.
 
-### `scripts` (`@workspace/scripts`)
+## Known Issues
 
-Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+1. **Facebook Login Required (FB mode):** You MUST provide valid Facebook credentials in config.json before the bot can run in FB mode.
+2. **Facebook Login Restrictions:** The bot may encounter login issues due to Facebook's security measures. If login fails, try logging into Facebook from a browser first.
+3. **Google Drive Features Removed:** Commands using Google Drive will fail gracefully with an error message.
+4. **Email Features Removed:** Mail functionality has been disabled.
+5. **Instagram Polling:** Instagram mode uses polling every 3s (no true websocket). This is the limitation of the private API.
+
+## Development Notes
+
+### Dependencies
+- Core: axios, express, fs-extra
+- Bot: ws3-fca (Facebook Chat API), instagram-private-api (Instagram)
+- Database: mongoose, sequelize, sqlite3
+- Instagram Adapter: dotenv, chalk@4, winston, winston-daily-rotate-file, node-cache, sharp
+- Utilities: canvas, cheerio, moment-timezone, node-cron
+
+### Environment
+- Runs on Replit with Node.js 20.x+
+- Auto-restart on crash (index.js launcher)
+- Keep-alive HTTP server on port 5000 (GET /status and GET /health)
+- INSTAGRAM_MODE env var switches spawned entry point
+
+## Support & Contact
+
+- **GitHub Issues:** https://github.com/Gtajisan/baka-chan-bot/issues
+- **Email:** ffjisan804@gmail.com
+- **Maintainer:** Gtajisan
+
+## License
+MIT License
+
+---
+Last Updated: March 19, 2026
