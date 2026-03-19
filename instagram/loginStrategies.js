@@ -33,18 +33,14 @@ function jitter(base = 1000, spread = 2000) {
   return base + Math.random() * spread;
 }
 
-// Mobile user-agent pool — rotated per login attempt to avoid fingerprinting
-const MOBILE_USER_AGENTS = [
-  "Instagram 275.0.0.27.98 Android (33/13; 420dpi; 1080x2340; samsung; SM-G991B; o1s; exynos2100; en_US; 458229258)",
-  "Instagram 289.0.0.20.118 Android (30/11; 420dpi; 1080x2220; OnePlus; HD1913; OnePlus7Pro; qcom; en_US; 479692943)",
-  "Instagram 262.0.0.20.108 Android (29/10; 480dpi; 1080x2280; Xiaomi; M2012K11AG; alioth; qcom; en_US; 432226180)",
-  "Instagram 278.1.0.16.107 Android (32/12; 560dpi; 1440x3120; samsung; SM-S908B; b0s; exynos2200; en_US; 461576628)",
-  "Instagram 291.0.0.34.111 Android (31/12; 420dpi; 1080x2400; Google; Pixel 7; panther; tensor; en_US; 483508629)",
+// Device seeds — each generates a unique device fingerprint via generateDevice()
+const DEVICE_SEEDS = [
+  "alpha_device_seed",
+  "beta_device_seed",
+  "gamma_device_seed",
+  "delta_device_seed",
+  "epsilon_device_seed",
 ];
-
-function randomUA() {
-  return MOBILE_USER_AGENTS[Math.floor(Math.random() * MOBILE_USER_AGENTS.length)];
-}
 
 // ─── Strategy 1: IG_SESSION_STATE env var ───────────────────────────────────
 async function strategyEnvState() {
@@ -144,12 +140,11 @@ async function strategyPrivateAPI(saveSessionFn) {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const ig = new IgApiClient();
-      const ua = randomUA();
-      ig.state.generateDevice(username);
-      ig.state.appUserAgent = ua;
+      const seed = username + "_" + (DEVICE_SEEDS[attempt - 1] || attempt);
+      ig.state.generateDevice(seed);
       ig.state.proxyUrl = process.env.IG_PROXY || undefined;
 
-      logger.info("LOGIN", `  Attempt ${attempt}/3 with UA: ${ua.slice(0, 50)}...`);
+      logger.info("LOGIN", `  Attempt ${attempt}/3 with device seed: ${seed}`);
 
       try { await ig.simulate.preLoginFlow(); } catch (_) {}
       await sleep(jitter(800, 1500));
