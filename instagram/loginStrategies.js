@@ -146,7 +146,7 @@ async function strategyPrivateAPI(saveSessionFn) {
       const ig = new IgApiClient();
       const ua = randomUA();
       ig.state.generateDevice(username);
-      ig.request.defaults.headers["User-Agent"] = ua;
+      ig.state.appUserAgent = ua;
       ig.state.proxyUrl = process.env.IG_PROXY || undefined;
 
       logger.info("LOGIN", `  Attempt ${attempt}/3 with UA: ${ua.slice(0, 50)}...`);
@@ -237,24 +237,37 @@ async function strategyWebAPI() {
   }
 }
 
-// ─── Strategy 6: ig-api (lightweight alternative) ────────────────────────────
-async function strategyIgApi() {
+// ─── Strategy 6: instagram-private-api with alternate device seed ─────────────
+// Last-resort: try with a completely different randomly generated device.
+async function strategyAltDevice(saveSessionFn) {
   const username = process.env.IG_USERNAME;
   const password = process.env.IG_PASSWORD;
   if (!username || !password) {
     logger.warn("LOGIN", "Strategy 6 SKIPPED: IG_USERNAME or IG_PASSWORD not set");
     return null;
   }
-  logger.info("LOGIN", `Strategy 6: ig-api login as @${username}...`);
+  logger.info("LOGIN", `Strategy 6: Alt-device fresh login as @${username}...`);
   try {
-    const IgApi = require("ig-api");
-    const ig = new IgApi();
-    await ig.login(username, password);
-    const self = await ig.self.info();
-    const userID = String(self.id || self.pk || "0");
+    const { IgApiClient } = require("instagram-private-api");
+    const ig = new IgApiClient();
+    // Use a random seed so it generates a completely different device fingerprint
+    const seed = username + "_" + Date.now();
+    ig.state.generateDevice(seed);
+    ig.state.proxyUrl = process.env.IG_PROXY || undefined;
 
-    logger.info("LOGIN", `Strategy 6 SUCCESS — ig-api connected as @${username} (id: ${userID})`);
-    return { igLite: ig, userID, method: "ig-api", username };
+    try { await ig.simulate.preLoginFlow(); } catch (_) {}
+    await sleep(jitter(2000, 3000));
+
+    const account = await ig.account.login(username, password);
+    await sleep(jitter(500, 1000));
+    try { await ig.simulate.postLoginFlow(); } catch (_) {}
+
+    const serialized = await ig.state.serialize();
+    delete serialized.constants;
+    saveSessionFn({ state: serialized, userID: String(account.pk) });
+
+    logger.info("LOGIN", `Strategy 6 SUCCESS — alt-device login as @${username}`);
+    return { ig, userID: String(account.pk), method: "alt-device" };
   } catch (err) {
     logger.warn("LOGIN", `Strategy 6 FAILED: ${err.message}`);
     return null;
@@ -272,7 +285,7 @@ async function tryAllStrategies(loadSessionFn, saveSessionFn) {
     () => strategyCookieFile(),
     () => strategyPrivateAPI(saveSessionFn),
     () => strategyWebAPI(),
-    () => strategyIgApi(),
+    () => strategyAltDevice(saveSessionFn),
   ];
 
   for (let i = 0; i < strategies.length; i++) {
@@ -305,4 +318,4 @@ async function tryAllStrategies(loadSessionFn, saveSessionFn) {
   throw new Error("All Instagram login strategies exhausted. See logs above for fix instructions.");
 }
 
-module.exports = { tryAllStrategies, strategyEnvState, strategySessionFile, strategyCookieFile, strategyPrivateAPI, strategyWebAPI, strategyIgApi };
+module.exports = { tryAllStrategies, strategyEnvState, strategySessionFile, strategyCookieFile, strategyPrivateAPI, strategyWebAPI, strategyAltDevice };
