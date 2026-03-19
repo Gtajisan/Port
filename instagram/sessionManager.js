@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const logger = require("./logger.js");
+const { tryAllStrategies } = require("./loginStrategies.js");
 
 const SESSION_FILE = path.join(process.cwd(), "session.json");
 const ALGORITHM = "aes-256-cbc";
@@ -43,19 +44,18 @@ function saveSession(sessionData) {
 }
 
 function loadSession() {
-  if (!fs.existsSync(SESSION_FILE)) {
-    logger.info("SESSION", "No session.json found — fresh login required");
-    return null;
-  }
+  if (!fs.existsSync(SESSION_FILE)) return null;
   try {
     const raw = fs.readFileSync(SESSION_FILE, "utf8").trim();
     if (!raw) return null;
-    const json = decrypt(raw);
-    const data = JSON.parse(json);
-    logger.info("SESSION", "Session loaded from session.json");
-    return data;
+    try {
+      const json = decrypt(raw);
+      return JSON.parse(json);
+    } catch (_) {
+      return JSON.parse(raw);
+    }
   } catch (err) {
-    logger.warn("SESSION", `Could not decrypt session.json (${err.message}) — fresh login required`);
+    logger.warn("SESSION", `Could not read session.json (${err.message})`);
     return null;
   }
 }
@@ -69,57 +69,26 @@ function clearSession() {
   }
 }
 
-async function loginFresh(IgApiClient) {
-  const ig = new IgApiClient();
+async function getInstagramClient() {
+  return await tryAllStrategies(loadSession, saveSession);
+}
+
+async function exportSession() {
+  const { IgApiClient } = require("instagram-private-api");
   const username = process.env.IG_USERNAME;
   const password = process.env.IG_PASSWORD;
-
-  if (!username || !password) {
-    throw new Error("IG_USERNAME and IG_PASSWORD must be set in .env");
-  }
-
+  if (!username || !password) { console.error("Set IG_USERNAME and IG_PASSWORD first"); process.exit(1); }
+  const ig = new IgApiClient();
   ig.state.generateDevice(username);
-  ig.state.proxyUrl = process.env.IG_PROXY || undefined;
-
-  logger.info("SESSION", `Logging in to Instagram as @${username}...`);
   await ig.simulate.preLoginFlow();
   const account = await ig.account.login(username, password);
   await ig.simulate.postLoginFlow();
-
   const serialized = await ig.state.serialize();
   delete serialized.constants;
-  saveSession({ state: serialized, userID: String(account.pk) });
-  logger.info("SESSION", `Logged in successfully as @${username} (pk: ${account.pk})`);
-  return { ig, userID: String(account.pk) };
+  const sessionData = { state: serialized, userID: String(account.pk) };
+  const b64 = Buffer.from(JSON.stringify(sessionData)).toString("base64");
+  console.log("\n✅ Copy this into Replit Secrets as IG_SESSION_STATE:\n");
+  console.log(b64);
 }
 
-async function loginWithSession(IgApiClient, sessionData) {
-  const ig = new IgApiClient();
-  ig.state.generateDevice(process.env.IG_USERNAME);
-  ig.state.proxyUrl = process.env.IG_PROXY || undefined;
-  await ig.state.deserialize(sessionData.state);
-  logger.info("SESSION", "Restored existing Instagram session");
-  return { ig, userID: sessionData.userID };
-}
-
-async function getInstagramClient() {
-  const { IgApiClient } = require("instagram-private-api");
-  const existing = loadSession();
-
-  if (existing) {
-    try {
-      const { ig, userID } = await loginWithSession(IgApiClient, existing);
-      await ig.account.currentUser();
-      logger.info("SESSION", "Session validated successfully");
-      return { ig, userID };
-    } catch (err) {
-      logger.warn("SESSION", `Session invalid (${err.message}) — attempting fresh login`);
-      clearSession();
-    }
-  }
-
-  const { ig, userID } = await loginFresh(IgApiClient);
-  return { ig, userID };
-}
-
-module.exports = { getInstagramClient, saveSession, loadSession, clearSession };
+module.exports = { getInstagramClient, saveSession, loadSession, clearSession, exportSession };

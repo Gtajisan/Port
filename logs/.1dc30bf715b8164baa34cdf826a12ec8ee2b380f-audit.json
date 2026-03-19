@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/home/runner/workspace/logs/.1dc30bf715b8164baa34cdf826a12ec8ee2b380f-audit.json",
+    "files": [
+        {
+            "date": 1773932943723,
+            "name": "/home/runner/workspace/logs/sakura-2026-03-19.log",
+            "hash": "bb92fb6d969ec7635e35515f1be51b976936c210409d722039588e63a93f7798"
+        }
+    ],
+    "hashType": "sha256"
+}
