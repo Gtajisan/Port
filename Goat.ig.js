@@ -10,6 +10,9 @@
 
 require("dotenv").config();
 
+// Initialize admin stats tracker
+require("./admin/stats.js");
+
 process.on("unhandledRejection", error => console.log(error));
 process.on("uncaughtException", error => console.log(error));
 

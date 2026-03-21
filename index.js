@@ -40,6 +40,44 @@ function startServer() {
     res.json({ ok: true, uptime: process.uptime(), mode: INSTAGRAM_MODE ? "instagram" : "facebook" });
   });
 
+  // ─── Admin Dashboard ───
+  app.get("/admin", (req, res) => {
+    res.sendFile(path.join(__dirname, "admin/dashboard.html"));
+  });
+
+  // ─── Admin API Endpoints ───
+  app.get("/admin/api/dashboard", (req, res) => {
+    res.json({
+      status: "running",
+      uptime: process.uptime(),
+      mode: INSTAGRAM_MODE ? "instagram" : "facebook",
+      threads: global.adminStats?.threads || 0,
+      users: global.adminStats?.users || 0,
+      messages: global.adminStats?.messages || 0,
+      recentThreads: global.adminStats?.recentThreads || [],
+    });
+  });
+
+  app.get("/admin/api/threads", (req, res) => {
+    res.json({
+      threads: global.adminStats?.allThreads || [],
+    });
+  });
+
+  app.get("/admin/api/users", (req, res) => {
+    res.json({
+      users: global.adminStats?.users || [],
+    });
+  });
+
+  app.get("/admin/api/messages", (req, res) => {
+    res.json({
+      total: global.adminStats?.messages || 0,
+      today: global.adminStats?.messagesToday || 0,
+      hourly: global.adminStats?.hourlyMessages || [],
+    });
+  });
+
   app.listen(PORT, "0.0.0.0", () => {
     log.info
       ? log.info(`Baka-Chan server started on port ${PORT}`)

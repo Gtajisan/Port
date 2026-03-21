@@ -89,6 +89,9 @@ function mapReaction(reactionData, messageID, threadID, senderID) {
     offlineThreadingID: toStr(messageID),
     timestamp: Date.now(),
     isGroup: false,
+    sourceBot: "instagram",
+    sourceType: "user",
+    source: "instagram",
   };
 }
 
@@ -126,8 +129,9 @@ function mapDirectMessage(rawItem, threadID, selfID) {
     type = "message";
   }
 
-  const isGroup = rawItem.thread_type === "group";
-  const participantIDs = (rawItem.participants || []).map(p => toStr(p.pk || p.id));
+  // Detect group chat: either explicit flag or multiple participants
+  const isGroup = rawItem.thread_type === "group" || (rawItem.participants && rawItem.participants.length > 2);
+  const participantIDs = (rawItem.participants || []).map(p => toStr(p.pk || p.id)).filter(Boolean);
 
   const mentions = {};
   if (rawItem.mentions) {
@@ -149,6 +153,9 @@ function mapDirectMessage(rawItem, threadID, selfID) {
     participantIDs,
     isUnread: rawItem.is_sent_by_viewer === false,
     sourceBot: "instagram",
+    sourceType: "user",
+    source: "instagram",
+    isBot: false,
   };
 
   if (rawItem.replied_to_message) {
@@ -167,13 +174,19 @@ function mapDirectMessage(rawItem, threadID, selfID) {
 
 function mapThreadInfo(rawThread) {
   const participants = rawThread.users || [];
-  const participantIDs = participants.map(u => toStr(u.pk || u.id || ""));
+  const participantIDs = participants.map(u => toStr(u.pk || u.id || "")).filter(Boolean);
+  
+  // Detect group: either explicit flag or multiple participants
+  const isGroup = rawThread.thread_type === "group" || rawThread.is_group === true || participantIDs.length > 2;
+  
   const nickNames = {};
   const userInfo = {};
 
   for (const u of participants) {
     const uid = toStr(u.pk || u.id || "");
+    if (!uid) continue;
     userInfo[uid] = {
+      id: uid,
       name: u.full_name || u.username || "",
       firstName: (u.full_name || "").split(" ")[0] || u.username || "",
       vanity: u.username || "",
@@ -190,18 +203,27 @@ function mapThreadInfo(rawThread) {
     }
   }
 
+  // For DMs, use participant name if no thread title
+  let threadName = rawThread.thread_title || "";
+  if (!threadName && !isGroup && participantIDs.length === 1) {
+    const firstParticipant = userInfo[participantIDs[0]];
+    threadName = firstParticipant?.name || firstParticipant?.vanity || "";
+  }
+
   return {
     threadID: toStr(rawThread.thread_id || rawThread.id || ""),
-    name: rawThread.thread_title || rawThread.thread_type === "group" ? rawThread.thread_title || "" : "",
+    name: threadName,
     participantIDs,
     userInfo,
     nickNames,
     emoji: rawThread.thread_theme?.emoji || "",
-    adminIDs: (rawThread.admin_user_ids || []).map(id => ({ id: toStr(id) })),
+    adminIDs: (rawThread.admin_user_ids || []).map(id => ({ id: toStr(id) })).filter(a => a.id),
     approvalMode: 0,
-    isGroup: rawThread.thread_type === "group",
+    isGroup,
     messageCount: rawThread.message_count || 0,
     imageSrc: rawThread.image?.url || "",
+    unreadCount: rawThread.unread_count || 0,
+    lastActivityTime: rawThread.last_activity_at || 0,
   };
 }
 

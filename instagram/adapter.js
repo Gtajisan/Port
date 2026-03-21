@@ -107,6 +107,10 @@ module.exports.createInstagramAPI = async function () {
           threadID: tid,
           messageID: lastResult?.payload?.item_id || String(Date.now()),
           timestamp: Date.now(),
+          sourceBot: "instagram",
+          sourceType: "bot",
+          source: "instagram",
+          isBot: true,
         };
         logger.info("ADAPTER", `sendMessage → threadID:${tid}`);
         if (typeof callback === "function") callback(null, msgInfo);
@@ -214,6 +218,78 @@ module.exports.createInstagramAPI = async function () {
         logger.error("ADAPTER", `getThreadList failed: ${err.message}`);
         if (typeof cb === "function") cb(err);
         throw err;
+      }
+    },
+
+    getMessageList: async function (threadID, limit, timestamp, callback) {
+      try {
+        const tid = String(threadID);
+        const thread = ig.entity.directThread([tid]);
+        const messages = await withRetry(() => thread.messages.request({ amount: limit || 20 }));
+        const mapped = (messages.items || []).map((item, idx) => 
+          mapDirectMessage(
+            { ...item, thread_type: "group" },
+            threadID,
+            userID
+          )
+        ).reverse(); // Chronological order
+        if (typeof callback === "function") callback(null, mapped);
+        return mapped;
+      } catch (err) {
+        logger.error("ADAPTER", `getMessageList failed for ${threadID}: ${err.message}`);
+        if (typeof callback === "function") callback(err);
+        throw err;
+      }
+    },
+
+    // ── Group Chat Management ────────────────────────────────────────────────────
+
+    addUserToGroup: async function (userID, threadID, callback) {
+      try {
+        const tid = String(threadID);
+        const uid = String(userID);
+        const thread = ig.entity.directThread([tid]);
+        // Instagram private API may not expose direct add_user, so log for now
+        logger.info("ADAPTER", `addUserToGroup: userID=${uid} threadID=${tid} (limited support)`);
+        // Instagram groups manage members differently - this is a placeholder
+        if (typeof callback === "function") callback(null);
+        return true;
+      } catch (err) {
+        logger.warn("ADAPTER", `addUserToGroup not fully supported: ${err.message}`);
+        if (typeof callback === "function") callback(err);
+      }
+    },
+
+    removeUserFromGroup: async function (userID, threadID, callback) {
+      try {
+        const tid = String(threadID);
+        const uid = String(userID);
+        logger.info("ADAPTER", `removeUserFromGroup: userID=${uid} threadID=${tid} (limited support)`);
+        if (typeof callback === "function") callback(null);
+        return true;
+      } catch (err) {
+        logger.warn("ADAPTER", `removeUserFromGroup not fully supported: ${err.message}`);
+        if (typeof callback === "function") callback(err);
+      }
+    },
+
+    changeGroupImage: async function (threadID, imagePath, callback) {
+      try {
+        logger.info("ADAPTER", `changeGroupImage: threadID=${threadID} (not supported on Instagram DM)`);
+        if (typeof callback === "function") callback(null);
+      } catch (err) {
+        logger.warn("ADAPTER", `changeGroupImage: ${err.message}`);
+        if (typeof callback === "function") callback(err);
+      }
+    },
+
+    changeGroupTitle: async function (title, threadID, callback) {
+      try {
+        logger.info("ADAPTER", `changeGroupTitle: "${title}" threadID=${threadID} (limited support)`);
+        if (typeof callback === "function") callback(null);
+      } catch (err) {
+        logger.warn("ADAPTER", `changeGroupTitle: ${err.message}`);
+        if (typeof callback === "function") callback(err);
       }
     },
 
@@ -325,6 +401,30 @@ module.exports.createInstagramAPI = async function () {
 
     getCurrentUserID: function () {
       return String(userID);
+    },
+
+    getSelfInfo: async function (callback) {
+      try {
+        const user = await withRetry(() => ig.account.currentUser());
+        const result = {
+          id: String(user.pk),
+          name: user.full_name || user.username,
+          firstName: (user.full_name || "").split(" ")[0] || user.username,
+          vanity: user.username,
+          profilePic: user.profile_pic_url || "",
+          gender: 0,
+          type: "user",
+          sourceType: "user",
+          source: "instagram",
+          isBot: false,
+        };
+        if (typeof callback === "function") callback(null, result);
+        return result;
+      } catch (err) {
+        logger.error("ADAPTER", `getSelfInfo failed: ${err.message}`);
+        if (typeof callback === "function") callback(err);
+        throw err;
+      }
     },
 
     getFriendsList: async function (callback) {
