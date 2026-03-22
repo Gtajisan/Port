@@ -1,135 +1,173 @@
-# Baka-Chan Bot — Instagram Edition
+# Baka-Chan Bot
 
-A production-grade Instagram DM bot built on the GoatBot V2 framework, with a full FCA-compatible adapter layer, encrypted session management, and a Meta-developer-style admin dashboard.
+## Overview
+Baka-Chan Bot is a modernized Facebook Messenger bot built with the ws3-fca library. This project has been rebranded from Goat Bot and now features a clean, modern architecture with updated dependencies.
+
+**Current Version:** 2.0.0  
+**Maintained by:** Gtajisan (ffjisan804@gmail.com)  
+**GitHub:** https://github.com/Gtajisan/baka-chan-bot
+
+## Recent Changes (October 11, 2025)
+
+### Major Updates
+1. **FCA Library Replacement** - Replaced old nexus-fca with ws3-fca (https://github.com/tas33n/ws3-fca)
+2. **Complete Rebranding** - Changed from Goat Bot to Baka-Chan Bot throughout the codebase
+3. **Dependency Cleanup** - Removed Google APIs, verification system, and dashboard features
+4. **Fixed Console Errors** - Resolved LSP errors and updated deprecated syntax
+5. **Modernized Structure** - Updated project configuration and removed unused features
+
+### Removed Features
+- Google Drive API integration
+- Gmail/Email functionality
+- Dashboard UI (removed entire dashboard directory)
+- User verification system
+- Google reCAPTCHA
+
+### Architecture Changes
+- **FCA Integration:** Bot now uses ws3-fca located in `fb-chat-api/` directory
+- **Simplified Config:** Removed Google credentials and dashboard settings from config.json
+- **Cleaner Dependencies:** Removed googleapis, nodemailer, and dashboard-related packages
 
 ## Project Structure
 
 ```
-instagram-bot/               ← All bot code lives here
-├── index.js                 ← Universal launcher (express server + bot child process)
-├── Goat.ig.js               ← Instagram-mode GoatBot V2 entry point
-├── Goat.js                  ← Original Facebook-mode entry point (preserved)
-├── admin/
-│   ├── dashboard.html       ← Meta-developer-style admin console (Pro UI)
-│   └── stats.js             ← AdminStats class — live thread/user/message tracking
-├── instagram/
-│   ├── adapter.js           ← FCA-compatible Instagram API (drop-in for fca-unofficial)
-│   ├── loginStrategies.js   ← 6-strategy login waterfall (session → cookies → creds)
-│   ├── sessionManager.js    ← AES-256-CBC encrypted session persistence
-│   └── messageMapper.js     ← Maps Instagram DM raw events → FCA event format
-├── bot/
-│   └── login/
-│       └── loginInstagram.js ← Instagram login flow (mirrors login.js for GoatBot V2)
-├── scripts/
-│   ├── exportSession.js     ← LOCAL: log in and export IG_SESSION_STATE base64
-│   ├── generateCookies.js   ← Browser cookie export helper
-│   └── importCookies.js     ← Cookie import helper
-├── .env.example             ← Fully documented env var reference
-└── package.json
+baka-chan-bot/
+├── bot/                    # Bot core logic
+│   ├── handler/           # Event and action handlers
+│   └── login/             # Login and authentication
+├── fb-chat-api/           # ws3-fca library
+├── assets/                # Bot assets and media
+├── database/              # Database schemas
+├── languages/             # Localization files
+├── scripts/               # Utility scripts
+├── logger/                # Logging utilities
+├── Goat.js               # Main bot file
+├── index.js              # Entry point with auto-restart
+├── config.json           # Bot configuration
+└── package.json          # Dependencies
 ```
 
-## Architecture
+## Setup & Configuration
 
-### Instagram Adapter (`instagram/adapter.js`)
-A drop-in replacement for `fca-unofficial` (Facebook Chat API). Exposes:
-- `sendMessage(msg, threadID)` — sends DM, handles text + attachments
-- `listenMqtt(callback)` — polls Instagram inbox at 3s intervals; maps events to FCA format
-- `getUserInfo(uid)` — fetches user profile info
-- `getThreadInfo(threadID)` — fetches conversation info
-- `getThreadList(limit)` — lists recent conversations
-- `markAsRead(threadID)` — marks conversation as read
-- `sendTypingIndicator(threadID)` — sends typing indicator
-- `getCurrentUserID()` — returns bot's Instagram user ID
-- `stopListening()` — stops the polling loop
-- `refreshFb_dtsg()` — no-op (FCA compat)
-- `_loginMethod` — tracks which auth strategy succeeded
+### Prerequisites
+- Node.js >= 18.x
+- npm >= 8.0.0
 
-### Login Strategies (`instagram/loginStrategies.js`)
-Tries in order:
-1. `IG_SESSION_STATE` env var (base64 serialized session — **recommended for cloud**)
-2. Encrypted `session.json` on disk
-3. `ig_cookies.json` browser cookie import
-4. `instagram-private-api` direct login
-5. `instagram-web-api` fallback
-6. Alternative device simulation
+### Installation
+```bash
+npm install
+```
 
-### Session Management (`instagram/sessionManager.js`)
-- AES-256-CBC encryption with key from `SESSION_SECRET` env var
-- Auto-saves session after every successful login
+### Configuration Files
+1. **config.json** - Main bot configuration
+   - **IMPORTANT:** Add your Facebook account email/password (never commit credentials to Git)
+   - Configure bot prefix and nickname
+   - Set admin IDs  
+   - Database settings (SQLite/MongoDB)
 
-### Stats Tracker (`admin/stats.js`)
-`global.adminStats` (AdminStats instance):
-- `.threads` — Map of threadID → thread info
-- `.users` — Map of userID → user info
-- `.messages` / `.messagesToday` — counters
-- `.hourlyMessages[24]` — per-hour message counts
-- `trackMessage(event)` — called on every inbound message
-- `trackBotMessage(threadID)` — called on every bot reply
-- `getDashboard()` — summary for `/admin/api/dashboard`
+2. **account.txt** - Facebook cookies/credentials (auto-populated)
 
-### Admin Dashboard (`admin/dashboard.html`)
-Pro Meta-developer-console UI accessible at `/admin`:
-- Live metric cards (threads, users, messages, uptime)
-- Hourly bar chart (24h activity)
-- Recent threads feed
-- Users list
-- Live log stream
-- Stats pages
+### Security Notes
+⚠️ **NEVER commit real Facebook credentials to the repository!**
+- Keep config.json in .gitignore
+- Use environment variables for production
+- Change default credentials before first use
 
-## Workflows
+### Running the Bot
+```bash
+npm start       # Production mode
+npm run dev     # Development mode
+```
 
-| Name | Command | Port |
-|------|---------|------|
-| Instagram Bot | `cd instagram-bot && INSTAGRAM_MODE=true node index.js` | 3000 |
+## Facebook Login
 
-## Environment Variables
+The bot supports multiple login methods:
+1. Email/Password with 2FA
+2. Facebook Token
+3. Cookie String
+4. Cookie Array
 
-Copy `.env.example` to `.env` and fill in. Required for the bot to start:
+Note: Facebook may block login from unknown locations. If you encounter login errors, try logging in from a browser first to verify your account.
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `IG_SESSION_STATE` | **OR** | Base64 session (from `node scripts/exportSession.js` locally) |
-| `IG_USERNAME` | **OR** | Instagram username |
-| `IG_PASSWORD` | **OR** | Instagram password |
-| `SESSION_SECRET` | Recommended | AES-256 key for encrypted session storage on disk |
-| `ADMIN_ID` | Recommended | Your Instagram numeric user ID (bot admin) |
-| `INSTAGRAM_MODE` | Defaults `true` | Set `false` to run in Facebook mode |
+## User Preferences
 
-## How to Connect Your Instagram Account
+### Coding Style
+- Standard JavaScript with Node.js best practices
+- Async/await for asynchronous operations
+- Modular structure with clear separation of concerns
 
-### Recommended (cloud-safe): Session Export
-1. On your **local machine** (not Replit):
-   ```bash
-   npm install instagram-private-api dotenv
-   node scripts/exportSession.js
-   ```
-2. Copy the printed base64 string
-3. In Replit → Secrets → add `IG_SESSION_STATE` with that value
-4. Restart the workflow
+### Bot Configuration
+- **Prefix:** `!` (configurable in config.json)
+- **Database:** SQLite (can be changed to MongoDB)
+- **Timezone:** Asia/Ho_Chi_Minh (configurable)
 
-### Alternative: Direct Credentials
-1. In Replit → Secrets:
-   - `IG_USERNAME` = your Instagram handle
-   - `IG_PASSWORD` = your password
-2. Restart the workflow
+## Instagram Mode (New)
 
-## API Endpoints
+Baka-Chan Bot now supports running on Instagram DM via a zero-modification adapter layer.
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /` | Landing page |
-| `GET /health` | Health check `{ok, uptime, mode}` |
-| `GET /status` | Status `{status, uptime, restarts, mode}` |
-| `GET /admin` | Admin dashboard HTML |
-| `GET /admin/api/dashboard` | Summary stats JSON |
-| `GET /admin/api/threads` | All threads JSON |
-| `GET /admin/api/users` | All users JSON |
-| `GET /admin/api/messages` | Message counts JSON |
+### How it works
+- `instagram/adapter.js` — FCA-interface-compatible api object using `instagram-private-api`
+- `instagram/sessionManager.js` — AES-256 encrypted session persistence (session.json)
+- `instagram/messageMapper.js` — Instagram DM items → FCA-compatible event objects
+- `instagram/rateLimiter.js` — 30 messages/60s per user/thread with exponential backoff
+- `instagram/mediaHandler.js` — Image optimization (sharp), buffer download/upload
+- `instagram/logger.js` — chalk + winston + daily-rotate-file logging
+- `bot/login/loginInstagram.js` — Instagram login bridge (replaces login.js logic)
+- `Goat.ig.js` — Instagram-mode entry point (twin of Goat.js)
 
-## Key Design Decisions
+### Switching to Instagram Mode
+```bash
+# 1. Copy .env.example to .env
+cp .env.example .env
 
-- **GoatBot V2 untouched**: All original commands, events, handlers, and database code are preserved. Only the login layer and FCA API object are replaced.
-- **FCA compatibility**: The adapter exposes the exact same method signatures that GoatBot V2's handlers expect — no changes to command files required.
-- **GBAN skipped**: Instagram user IDs have no overlap with the Facebook GBAN list; the remote fetch is skipped (dataGban = {}).
-- **Rate limiting**: 30 msg/min per user and per thread; exponential backoff on 429 errors.
-- **No native modules**: `npm install --ignore-scripts` skips `better-sqlite3` native compilation which fails on Replit's NixOS.
+# 2. Fill in your Instagram credentials
+# Edit .env:  IG_USERNAME, IG_PASSWORD, INSTAGRAM_MODE=true
+
+# 3. Start the bot — index.js detects INSTAGRAM_MODE=true and spawns Goat.ig.js
+npm start
+```
+
+### API Compatibility
+The `api` object returned by `createInstagramAPI()` is 100% interface-compatible with FCA:
+- `sendMessage`, `sendTypingIndicator`, `markAsRead`, `unsendMessage`
+- `getUserInfo`, `getThreadInfo`, `getThreadList`
+- `setMessageReaction`, `listenMqtt`, `stopListening`
+- `getCurrentUserID`, `getFriendsList`
+- FCA stubs (no-ops): `setOptions`, `getAppState`, `refreshFb_dtsg`
+
+All existing commands (`scripts/cmds/`) and events (`scripts/events/`) work unchanged.
+
+## Known Issues
+
+1. **Facebook Login Required (FB mode):** You MUST provide valid Facebook credentials in config.json before the bot can run in FB mode.
+2. **Facebook Login Restrictions:** The bot may encounter login issues due to Facebook's security measures. If login fails, try logging into Facebook from a browser first.
+3. **Google Drive Features Removed:** Commands using Google Drive will fail gracefully with an error message.
+4. **Email Features Removed:** Mail functionality has been disabled.
+5. **Instagram Polling:** Instagram mode uses polling every 3s (no true websocket). This is the limitation of the private API.
+
+## Development Notes
+
+### Dependencies
+- Core: axios, express, fs-extra
+- Bot: ws3-fca (Facebook Chat API), instagram-private-api (Instagram)
+- Database: mongoose, sequelize, sqlite3
+- Instagram Adapter: dotenv, chalk@4, winston, winston-daily-rotate-file, node-cache, sharp
+- Utilities: canvas, cheerio, moment-timezone, node-cron
+
+### Environment
+- Runs on Replit with Node.js 20.x+
+- Auto-restart on crash (index.js launcher)
+- Keep-alive HTTP server on port 5000 (GET /status and GET /health)
+- INSTAGRAM_MODE env var switches spawned entry point
+
+## Support & Contact
+
+- **GitHub Issues:** https://github.com/Gtajisan/baka-chan-bot/issues
+- **Email:** ffjisan804@gmail.com
+- **Maintainer:** Gtajisan
+
+## License
+MIT License
+
+---
+Last Updated: March 19, 2026

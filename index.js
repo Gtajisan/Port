@@ -111,9 +111,21 @@ function startServer() {
     });
   });
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     log.info(`Baka-Chan server listening on port ${PORT}`);
     log.info(`Admin dashboard: http://localhost:${PORT}/admin`);
+  });
+
+  server.on("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+      log.error(`Port ${PORT} already in use. Retrying in 2s...`);
+      setTimeout(() => {
+        server.close();
+        server.listen(PORT, "0.0.0.0");
+      }, 2000);
+    } else {
+      throw err;
+    }
   });
 }
 

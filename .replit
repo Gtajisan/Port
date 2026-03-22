@@ -30,13 +30,13 @@ args = "Instagram Bot"
 name = "Instagram Bot"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd instagram-bot && INSTAGRAM_MODE=true node index.js"
-waitForPort = 3000
-
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "INSTAGRAM_MODE=true node index.js"
+waitForPort = 3000
 
 [agent]
 stack = "PNPM_WORKSPACE"
