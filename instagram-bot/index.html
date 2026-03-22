@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Baka-Chan Bot</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', sans-serif;
+      color: #fff;
+    }
+    .card {
+      text-align: center;
+      padding: 48px 56px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 24px;
+      backdrop-filter: blur(12px);
+      max-width: 480px;
+      width: 90%;
+    }
+    .emoji { font-size: 72px; margin-bottom: 20px; }
+    h1 { font-size: 2rem; font-weight: 700; margin-bottom: 8px; }
+    h1 span { color: #e91e8c; }
+    .version {
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.4);
+      margin-bottom: 24px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 32px;
+    }
+    .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #4caf50;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .status-text { font-size: 0.95rem; color: rgba(255,255,255,0.7); }
+    .links { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .link {
+      padding: 10px 20px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #fff;
+      text-decoration: none;
+      font-size: 0.85rem;
+      transition: background 0.2s;
+    }
+    .link:hover { background: rgba(255,255,255,0.15); }
+    .divider { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 28px 0; }
+    .uptime-label { font-size: 0.75rem; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 1px; }
+    #uptime { font-size: 1.1rem; font-weight: 600; color: #e91e8c; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="emoji">🎀</div>
+    <h1>Baka-<span>Chan</span></h1>
+    <div class="version">Instagram Bot · v2.0.0</div>
+    <div class="status-row">
+      <div class="dot"></div>
+      <span class="status-text">Bot is running</span>
+    </div>
+    <div class="links">
+      <a class="link" href="/status">📊 Status JSON</a>
+      <a class="link" href="/health">💚 Health Check</a>
+    </div>
+    <hr class="divider">
+    <div class="uptime-label">Uptime</div>
+    <div id="uptime">Loading...</div>
+  </div>
+
+  <script>
+    function formatUptime(sec) {
+      const d = Math.floor(sec / 86400);
+      const h = Math.floor((sec % 86400) / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = Math.floor(sec % 60);
+      return [d && d + 'd', h && h + 'h', m && m + 'm', s + 's'].filter(Boolean).join(' ');
+    }
+    async function refresh() {
+      try {
+        const r = await fetch('/status');
+        const d = await r.json();
+        document.getElementById('uptime').textContent = formatUptime(d.uptime);
+      } catch (_) {}
+    }
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>
